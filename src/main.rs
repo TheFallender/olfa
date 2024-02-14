@@ -127,6 +127,7 @@ fn get_latest_dir(path_pattern: &str) -> Result<PathBuf, Error> {
 fn run_executable(path: &PathBuf, args: &[String]) -> std::io::Result<()> {
     let output = Command::new(path)
         .args(args)
+        .current_dir(path.parent().unwrap())
         .output()?;
     if !output.status.success() {
         Err(Error::new(std::io::ErrorKind::Other, "Command was not successful"))
