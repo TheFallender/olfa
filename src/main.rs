@@ -42,7 +42,7 @@ fn get_version_number(entry: &fs::DirEntry) -> Vec<u32> {
 // Get the directory with the highest version number from a specified base directory
 fn get_latest_dir(path_pattern: &str) -> Result<PathBuf, Error> {
     // Extract the folder example part of the path of a pattern like "C:\<folder_example>*\foo\bar.exe"
-    let fixed_path_pattern: String = path_pattern.replace("/", "\\");
+    let fixed_path_pattern: String = path_pattern.replace("/", "\\").to_lowercase();
     let path_parts: Vec<&str> = fixed_path_pattern.split("\\").collect();
 
     // Get the folder example part of the path
@@ -72,17 +72,32 @@ fn get_latest_dir(path_pattern: &str) -> Result<PathBuf, Error> {
     } else if !regex::Regex::new(r"^\w:").unwrap().is_match(&search_path) {
         search_path = format!("{}{}\\", current_dir.to_str().unwrap(), search_path);
     }
+    search_path = search_path.to_lowercase();
 
     // Get the directories
-    let versions = fs::read_dir(&search_path)?;
-    let mut versions = versions
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().unwrap().is_dir())
-        .filter(|entry| entry.file_name()
-            .to_string_lossy()
-            .to_lowercase()
-            .contains(&versioning_pattern))
-        .collect::<Vec<_>>();
+    let versions_search = match fs::read_dir(&search_path) {
+        Ok(versions) => versions,
+        Err(e) => {
+            eprintln!("Error reading directory: {}", e);
+            return Err(e);
+        }
+    };
+
+    let mut versions = Vec::new();
+    for entry_res in versions_search {
+        match entry_res {
+            Ok(entry) => {
+                if entry.file_type()?.is_dir() {
+                    if entry.file_name().to_string_lossy().to_lowercase().contains(&versioning_pattern) {
+                        versions.push(entry);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error reading entry: {}", e);
+            }
+        }
+    }
 
     // Sort the directories
     versions.sort_by(|a, b| {
