@@ -118,7 +118,6 @@ fn get_latest_dir(path_pattern: &str) -> Result<PathBuf, Error> {
         None => None,
     };
 
-
     // Get the latest directory
     let latest_path: Option<PathBuf> = match latest_version {
         Some(version_folder_path) => Some(PathBuf::from(format!("{}{}",
@@ -128,25 +127,31 @@ fn get_latest_dir(path_pattern: &str) -> Result<PathBuf, Error> {
         None => None,
     };
 
-    println!("{:?}", latest_path);
-
-    // Return the latest path
+    // Do a final check to see if the latest path exists
     match latest_path {
-        Some(path) => Ok(path),
+        Some(path) => {
+            if path.exists() {
+                Ok(path)
+            } else {
+                Err(Error::new(std::io::ErrorKind::Other, "No valid path found"))
+            }
+        }
         None => Err(Error::new(std::io::ErrorKind::Other, "No directories found")),
     }
 }
 
-
 // Function to run an executable
 fn run_executable(path: &PathBuf, args: &[String]) -> std::io::Result<()> {
-    let output = Command::new(path)
+    match Command::new(path)
         .args(args)
         .current_dir(path.parent().unwrap())
-        .output()?;
-    if !output.status.success() {
-        Err(Error::new(std::io::ErrorKind::Other, "Command was not successful"))
-    } else {
-        Ok(())
+        .spawn() {
+        Ok(_child) => {
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed to run executable: {}", e);
+            Err(Error::new(std::io::ErrorKind::Other, format!("Failed to run executable: {}", e)))
+        }
     }
 }
